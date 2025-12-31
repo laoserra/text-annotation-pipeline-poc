@@ -7,6 +7,8 @@ Following a **Minimum Viable Product (Stage 1)** approach, the system ingests ra
 
 Valid tickets are handed off via RabbitMQ to a containerized worker service that performs preprocessing, PII redaction, and deduplication using text and fuzzy hashing before publishing tasks to a human annotation queue, where annotators label intents in a lightweight interface.
 
+Annotation reliability is determined exclusively through inter-annotator agreement, while Confidence Score (CS) is stored as separate metadata derived automatically from historical agreement within semantic similarity clusters, and exact duplicates are rate-limited per day to avoid annotation overload without sacrificing lineage.
+
 **Structured JSON logs** capture record-level lineage events at each transition, while dataset snapshots are versioned for reproducibility using DVC on object storage.
 
 In **future stages (Stage 2+)**, complexity is added only if justified by system scale and sprint priorities, including formal orchestration (Airflow), OpenLineage event emission, lineage visualization/governance (Marquez), service observability (Prometheus + Grafana), data quality anomaly detection (e.g., Sifflet/Monte-Carlo-style checks), log management tools (ELK Stack) and annotation performance dashboards.
@@ -86,8 +88,9 @@ D2 --> D3
 | Structured Logging | **JSON logs + local / centralized log storage** | Machine-readable logs provide auditability, traceability, and lineage reconstruction without additional orchestration complexity. |
 | Text Preprocessing | Spacy + Custom Rules | Efficient NLP pipeline for tokenization, normalization, and custom cleaning rules; integrates easily with Python worker service and ensures consistent text formatting before deduplication and annotation. |
 | PII Detection & Redaction | Microsoft Presidio | Detects and redacts sensitive personal information (PII) in tickets to comply with privacy requirements; runs alongside deduplication in the preprocessing worker to ensure annotated data is privacy-compliant. |
-| Deduplication | **Hash cleaned text / Datasketch (MinHash + LSH)** | Two-step deduplication ensures efficiency and correctness: (1) exact duplicates are removed using a deterministic hash of the preprocessed text, (2) near-duplicates are detected using MinHash + LSH (Datasketch) to avoid redundant annotation while maintaining semantic uniqueness. |
+| Deduplication | **Exact text hashing + Datasketch (MinHash + LSH)** | Dedup is applied as a load-shedding, not data-loss mechanism: exact duplicates are allowed for annotation until a daily threshold of identical cleaned texts is reached, after which additional copies are stored in the Raw Layer but not enqueued for human annotation. Near-duplicates are grouped using MinHash + LSH to support agreement analysis. |
 | Annotation Interface | **Prodigy** | Simple human-in-the-loop labeling interface, integrates with Python pipelines, supports custom labeling workflows. |
+| Annotation DB | **PostgreSQL** | ACID compliance, strong schema enforcement, ideal for high-integrity labeled data. |
 | Dataset Versioning  | **DVC + S3** | Tracks versions of datasets, hashes, and schema; integrates easily with ML pipelines, ensuring reproducibility. |
 
 
@@ -112,13 +115,9 @@ Lineage is tracked at the individual ticket level using:
 
 - This ID is propagated through every stage and stored in every layer, enabling traceability, debugging, and exact deduplication.
 
-#### 2. Exact duplicate filtering via ID
+#### 2. Near-duplicate (semantic) similarity
 
-- If an incoming ticket generates a `record_id` that already exists in the Raw layer, it is immediately discarded from downstream queueing to avoid redundant processing, while the original record remains stored immutably.
-
-#### 3. Fuzzy deduplication downstream (MinHash + LSH)
-
-- Near-duplicate tickets (not exact ID matches) are detected later in Curated using **MinHash + LSH similarity search** (e.g., Datasketch) to prevent duplicated semantic content from reaching annotators or training exports.
+- Semantic near-duplicates are not removed before annotation. Instead, they are grouped into similarity clusters using MinHash + LSH (e.g., Datasketch) in the Curated Layer. These clusters serve as a historical signal source to compute inter-annotator agreement and automatically derive the Confidence Score (CS) for labels, while preserving each ticket as a distinct raw record for lineage and auditing.
 
 ### 4.3 Event-Based Lineage (Log-Based)
 
