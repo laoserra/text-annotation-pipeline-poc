@@ -4,7 +4,7 @@
 """
 PoC Quality Validator & Output Generator for intent classification annotations.
 
-Applies:
+Validates raw text annotations by applying:
   1) Confidence threshold filtering
   2) Inter-annotator agreement check
 
@@ -38,8 +38,7 @@ FILE_OUT.parent.mkdir(parents=True, exist_ok=True)
 # Logging setup (daily file)
 # -----------------------------------------------------------------------------
 today: str = datetime.today().strftime("%Y-%m-%d")
-today_str: str = datetime.today().strftime("%Y%m%d")
-file_log: Path = DIR_LOGS / today / f"disagreements_{today_str}.log"
+file_log: Path = DIR_LOGS / today / "disagreements.log"
 file_log.parent.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
@@ -89,7 +88,7 @@ def detect_disagreements(df: pd.DataFrame) -> List[Dict[str, List]]:
 
 
 def extract_agreed(df: pd.DataFrame) -> pd.DataFrame:
-    """Return one (text, label) per text where annotators fully agreed."""
+    """Return one row (text + label) per text where all annotators agreed."""
     label_sets = df.groupby("text")["label"].agg(set)
     agreed_texts = label_sets[label_sets.apply(len) == 1].index
     return df[df["text"].isin(agreed_texts)][["text", "label"]].drop_duplicates()
@@ -111,19 +110,30 @@ def main() -> None:
 
     console.info("Filtering by confidence…")
     df_conf = filter_by_confidence(df_raw, CONF_THRESHOLD)
-    console.info(f"After confidence filter: {len(df_conf)} rows")
+    console.info(f"After confidence filter: {len(df_conf)} rows left")
+
+    if df_conf.empty:
+        console.info("All samples failed the confidence score check!")
+        console.info("No final training dataset created.")
+        console.info("Done.")
+        return
 
     console.info("Checking agreement…")
     disagreements = detect_disagreements(df_conf)
+    console.info(f"Disagreed samples: {len(disagreements)}")
+
     if disagreements:
-        logging.info("Disagreed samples:")
         for rec in disagreements:
             logging.info(json.dumps(rec, ensure_ascii=False))
-    else:
-        logging.info("Disagreed samples: 0")
 
     df_clean = extract_agreed(df_conf)
     console.info(f"Agreed samples: {len(df_clean)}")
+
+    if df_clean.empty:
+        console.info("All samples failed the agreement test!")
+        console.info("No final training dataset created.")
+        console.info("Done.")
+        return
 
     console.info("Exporting JSONL…")
     export_jsonl(df_clean, FILE_OUT)
