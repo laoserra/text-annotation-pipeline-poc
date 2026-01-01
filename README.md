@@ -10,7 +10,7 @@
 
 ## 🏛️ Project Overview
 
-This repository implements Part 2 (PoC) of a text annotation pipeline for intent classification.
+This repository implements **Part 2 (PoC)** of a text annotation pipeline for intent classification.
 It validates human annotations for quality and exports a model-ready dataset.
 
 **Quality validations:**
@@ -42,10 +42,6 @@ uv run scripts/process_annotations.py
 
 
 ## 📊 Key Findings & Results
-
-As already mentioned above, this PoC produces:
-- `logs/<date>/disagreements.log` → structured JSON records of label conflicts
-- `data/processed/clean_training_dataset.jsonl` → one (text, label) pair per fully-agreed sample
 
 The log file stores rich context per disagreement, for example:
 ```json
@@ -88,10 +84,9 @@ text-annotation-pipeline-poc/
 ```
 
 
-## 🔗 How PoC Fits Stage 1 (High-Level Architecture)
+## 🔗 How PoC Fits Part 1 (High-Level Architecture)
 
-This script represents the Model-Ready layer of the [larger system](./design_document.md):
-
+This script fits into the Model-Ready layer of the larger system designed in [Part 1](./design_document.md):
 - Runs after human annotation collection
 - Acts as a quality gate before ML training data export
 - Simulates a minimal but realistic pipeline boundary contract
