@@ -10,19 +10,18 @@
 
 ## 🏛️ Project Overview
 
-This repository implements **Part 2 (PoC)** of a text annotation pipeline for intent classification.
-It validates human annotations for quality and exports a model-ready dataset.
+This repository provides a **Proof-of-Concept (PoC)** of a text annotation pipeline for intent classification (e.g., classifying customer support tickets). It includes a **Quality Validator**, which filters and checks annotation quality, and an **Output Generator**, which exports a cleaned, model-ready dataset.
 
-**Quality validations:**
+**Quality checks:**
 - a confidence score threshold (≥ 0.8)
 - an inter-annotator agreement check
 
-**Agreed samples** are exported as JSONL for ML training, while **disagreements** are logged for inspection.
-
+Agreed samples are exported as `JSONL` for ML training. Disagreements are logged with structured `JSON` records for review.
 
 ## ⚙️ Prerequisites
 
 - [Astral UV](https://docs.astral.sh/uv/getting-started/installation/) (Python 3.12+ runner & package manager)
+-  Linux operating system
 
 ## 🚀 Quick Start
 
@@ -48,7 +47,7 @@ The log file stores rich context per disagreement, for example:
 {"text": "I need to reset my password", "labels": ["login_issue","password_reset"], "annotators": [1, 6], "confidence_scores": [0.92, 0.87]}
 ```
 
-The JSONL output is intentionally minimal and ML-friendly:
+**ML-ready output (JSONL)**, kept minimal by design for efficient model training:
 ```json
 {"text": "Reset my password please", "label": "password_reset"}
 {"text": "My parcel is missing", "label": "shipping_issue"}
@@ -84,7 +83,7 @@ text-annotation-pipeline-poc/
 ```
 
 
-## 🔗 How PoC Fits Part 1 (High-Level Architecture)
+## 🧩 How PoC Fits Part 1 (High-Level Architecture)
 
 This script fits into the Model-Ready layer of the larger system designed in [Part 1](./design_document.md):
 - Runs after human annotation collection
